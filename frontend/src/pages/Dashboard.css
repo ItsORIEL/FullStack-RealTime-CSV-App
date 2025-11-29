@@ -1,0 +1,78 @@
+/* Navigation Header */
+.nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.nav h2, .nav h3 {
+  margin: 0;
+  color: #2c3e50;
+}
+
+/* Admin Upload Section */
+.card.admin-upload {
+  border-left: 5px solid #007bff;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 25px;
+}
+
+/* --- TABLE STYLES (The Fix) --- */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: separate; /* Allows border radius */
+  border-spacing: 0;
+  margin-top: 10px;
+}
+
+/* Headers */
+th {
+  background-color: #f1f3f5;
+  color: #495057;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  padding: 15px;
+  text-align: left;
+  border-bottom: 2px solid #dee2e6;
+}
+
+/* Rows */
+td {
+  padding: 15px;
+  border-bottom: 1px solid #e9ecef;
+  vertical-align: middle;
+  color: #333;
+}
+
+tr:last-child td {
+  border-bottom: none;
+}
+
+tr:hover {
+  background-color: #f8f9fa;
+}
+
+/* --- FIXING THE BUTTONS INSIDE TABLE --- */
+td button {
+  padding: 6px 12px;     /* Smaller padding */
+  font-size: 0.85rem;    /* Smaller text */
+  margin-right: 8px;     /* Space between View and Delete */
+  display: inline-block; /* Prevent stacking */
+  width: auto;           /* Don't stretch */
+}
+
+/* View Button specific color */
+td button:first-child {
+  background-color: #17a2b8; /* Teal color for View */
+}
+td button:first-child:hover {
+  background-color: #138496;
+}
