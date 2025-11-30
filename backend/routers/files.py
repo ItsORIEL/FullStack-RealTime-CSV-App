@@ -1,12 +1,11 @@
 import os
 import shutil
-import uuid  # <--- NEW IMPORT
+import uuid
 import pandas as pd
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 
-# Absolute imports
 from database import get_session
 from models import FileMetadata, User
 from auth_utils import get_current_user, get_current_admin
@@ -24,22 +23,15 @@ async def upload_file(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_admin)
 ):
-    print(f"🆔 FILES ROUTER Manager ID: {id(manager)}")
-    
-    # 1. Generate a UNIQUE filename for storage (to prevent overwrites)
-    # e.g., "a1b2c3d4_mydata.csv"
     unique_storage_name = f"{uuid.uuid4()}_{file.filename}"
     path = os.path.join(UPLOAD_DIR, unique_storage_name)
     
-    # 2. Save to disk using the unique name
     with open(path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
     
-    # 3. Save to DB
-    # We store the ORIGINAL filename for display, but the UNIQUE path for logic
     new_file = FileMetadata(
-        filename=file.filename,  # What the user sees
-        filepath=path,           # Where it actually lives
+        filename=file.filename,
+        filepath=path,
         size_bytes=os.path.getsize(path),
         uploaded_by=current_user.username
     )
@@ -49,7 +41,6 @@ async def upload_file(
     await manager.broadcast("file_uploaded")
     return {"info": "File saved", "id": new_file.id}
 
-# ... (The rest of the file stays exactly the same)
 @router.get("/files", response_model=List[FileMetadata])
 def list_files(session: Session = Depends(get_session), current_user: User = Depends(get_current_user)):
     return session.exec(select(FileMetadata)).all()
@@ -72,7 +63,6 @@ async def delete_file(
     session.delete(file_record)
     session.commit()
 
-    print(f"🆔 FILES ROUTER (Delete) Manager ID: {id(manager)}")
     await manager.broadcast("file_deleted")
     return {"ok": True}
 

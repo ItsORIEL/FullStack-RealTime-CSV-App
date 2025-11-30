@@ -9,8 +9,6 @@ from routers import auth, files
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_db_and_tables()
-    # DEBUG: Print the ID of the manager in Main
-    print(f"🆔 MAIN Manager ID: {id(manager)}") 
     yield
 
 app = FastAPI(

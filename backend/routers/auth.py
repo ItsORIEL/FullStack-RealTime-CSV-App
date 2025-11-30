@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 
-# Absolute imports (works when running from backend folder)
 from database import get_session
 from models import User, UserCreate, UserRead, Token
 from auth_utils import (

@@ -4,7 +4,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import { useAuth } from './context/AuthContext';
 
-// Standard React Pattern
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const { token } = useAuth();
   if (!token) return <Navigate to="/login" replace />;

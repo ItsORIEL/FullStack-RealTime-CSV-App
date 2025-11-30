@@ -1,157 +1,308 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  Box,
+  Button,
+  Card,
+  Container,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Toolbar,
+  Typography,
+  CircularProgress,
+  Paper,
+  Stack,
+} from '@mui/material';
+import { CloudUpload as CloudUploadIcon, Delete as DeleteIcon, Visibility as VisibilityIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { useAuth } from '../context/AuthContext';
 import { fileService } from '../services/fileService';
-import { useWebSocket } from '../hooks/useWebSocket'; // <--- Import the new hook
+import { useWebSocket } from '../hooks/useWebSocket';
 import { FileMetadata } from '../types';
-import '../pages/Dashboard.css';
 
-const DataViewer = ({ data }: { data: any[] }) => {
-  if (!data || data.length === 0) return <p>No data to display</p>;
-  const headers = Object.keys(data[0]);
+const DataViewer = ({ csvData }: { csvData: any[] }) => {
+  if (!csvData || csvData.length === 0) {
+    return (
+      <Typography color="textSecondary" align="center" sx={{ padding: 2 }}>
+        No data to display
+      </Typography>
+    );
+  }
+
+  const columnHeaders = Object.keys(csvData[0]);
+
   return (
-    <div className="table-wrapper">
-      <table>
-        <thead>
-          <tr>{headers.map(h => <th key={h}>{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i}>{headers.map(h => <td key={`${i}-${h}`}>{String(row[h])}</td>)}</tr>
+    <TableContainer component={Paper} sx={{ marginTop: 2 }}>
+      <Table stickyHeader>
+        <TableHead>
+          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+            {columnHeaders.map((headerName) => (
+              <TableCell
+                key={headerName}
+                sx={{
+                  fontWeight: 600,
+                  backgroundColor: '#f5f5f5',
+                  textTransform: 'uppercase',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {headerName}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {csvData.map((rowData, rowIndex) => (
+            <TableRow
+              key={rowIndex}
+              sx={{
+                '&:hover': {
+                  backgroundColor: '#f9f9f9',
+                },
+              }}
+            >
+              {columnHeaders.map((headerName) => (
+                <TableCell key={`${rowIndex}-${headerName}`}>
+                  {String(rowData[headerName])}
+                </TableCell>
+              ))}
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 };
 
 export default function Dashboard() {
   const { role, username, logout } = useAuth();
-  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [filesList, setFilesList] = useState<FileMetadata[]>([]);
   const [selectedFileContent, setSelectedFileContent] = useState<any[] | null>(null);
-  const [loadingContent, setLoadingContent] = useState(false);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Stable Load Function
-  const loadFiles = useCallback(async () => {
+  const loadFilesList = useCallback(async () => {
     try {
-      const data = await fileService.getAll();
-      setFiles(data);
+      const filesData = await fileService.getAll();
+      setFilesList(filesData);
     } catch (error) {
-      console.error("Failed to load files", error);
+      console.error('Failed to load files', error);
     }
   }, []);
 
-  // 2. Initial Load
   useEffect(() => {
-    loadFiles();
-  }, [loadFiles]);
+    loadFilesList();
+  }, [loadFilesList]);
 
-  // 3. REAL-TIME MAGIC ✨
-  // This one line handles connection, disconnection, and auto-reconnection!
   useWebSocket((message) => {
-    if (message === "file_uploaded" || message === "file_deleted") {
-      console.log("🔔 Update received:", message);
-      loadFiles();
+    if (message === 'file_uploaded' || message === 'file_deleted') {
+      console.log('🔔 Update received:', message);
+      loadFilesList();
     }
   });
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0]) return;
+  const handleFileUpload = async (uploadEvent: React.ChangeEvent<HTMLInputElement>) => {
+    if (!uploadEvent.target.files || !uploadEvent.target.files[0]) return;
     try {
-      await fileService.upload(e.target.files[0]);
-      // Note: WebSocket will trigger the update for everyone, including us
+      await fileService.upload(uploadEvent.target.files[0]);
     } catch (error) {
-      alert("Upload failed!");
+      alert('Upload failed!');
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Are you sure?")) return;
+  const handleFileDelete = async (fileId: number) => {
+    if (!confirm('Are you sure you want to delete this file?')) return;
     try {
-      await fileService.delete(id);
-      // Note: WebSocket will trigger the update
+      await fileService.delete(fileId);
       setSelectedFileContent(null);
     } catch (error) {
-      alert("Delete failed! (Are you an admin?)");
+      alert('Delete failed! (Are you an admin?)');
     }
   };
 
-  const handleView = async (id: number) => {
-    setLoadingContent(true);
+  const handleViewFile = async (fileId: number) => {
+    setIsLoadingContent(true);
     try {
-      const data = await fileService.getContent(id);
-      setSelectedFileContent(data);
+      const csvContent = await fileService.getContent(fileId);
+      setSelectedFileContent(csvContent);
     } catch (error) {
-      alert("Could not load file content");
+      alert('Could not load file content');
     } finally {
-      setLoadingContent(false);
+      setIsLoadingContent(false);
     }
   };
 
   return (
-    <div className="container">
-      <div className="nav">
-        <div>
-          <h2>CSV Dashboard</h2>
-          <small>Welcome, {username} ({role})</small>
-        </div>
-        <button className="secondary" onClick={logout}>Logout</button>
-      </div>
+    <Container maxWidth="lg">
+      <Box sx={{ padding: 2 }}>
+        {/* Header Toolbar */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 4,
+            padding: 2,
+            backgroundColor: '#fafafa',
+            borderRadius: 1,
+          }}
+        >
+          <Box>
+            <Typography variant="h4" component="h2" sx={{ fontWeight: 600, marginBottom: 0.5 }}>
+              CSV Dashboard
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Welcome, <strong>{username}</strong> ({role})
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            color="error"
+            startIcon={<LogoutIcon />}
+            onClick={logout}
+          >
+            Logout
+          </Button>
+        </Box>
+        {role === 'admin' && (
+          <Card
+            sx={{
+              marginBottom: 3,
+              padding: 3,
+              borderLeft: '5px solid #1976d2',
+              backgroundColor: '#f3f4f6',
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center">
+              <CloudUploadIcon sx={{ color: '#1976d2' }} />
+              <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                Admin Upload:
+              </Typography>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileUpload}
+                style={{ flex: 1 }}
+              />
+            </Stack>
+          </Card>
+        )}
 
-      {role === 'admin' && (
-        <div className="card admin-upload">
-          <strong>Admin Upload:</strong>
-          <input type="file" accept=".csv" ref={fileInputRef} onChange={handleUpload} />
-        </div>
-      )}
+        <Card sx={{ marginBottom: 3 }}>
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flex: 1, fontWeight: 600 }}>
+              Available Files
+            </Typography>
+          </Toolbar>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                    Filename
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                    Size (Bytes)
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                    Uploaded By
+                  </TableCell>
+                  <TableCell sx={{ fontWeight: 600, textTransform: 'uppercase', fontSize: '0.85rem' }}>
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filesList.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ padding: 3 }}>
+                      <Typography color="textSecondary">No files found</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filesList.map((fileItem) => (
+                    <TableRow
+                      key={fileItem.id}
+                      sx={{
+                        '&:hover': {
+                          backgroundColor: '#f9f9f9',
+                        },
+                      }}
+                    >
+                      <TableCell>{fileItem.filename}</TableCell>
+                      <TableCell>{fileItem.size_bytes}</TableCell>
+                      <TableCell>{fileItem.uploaded_by}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="info"
+                            startIcon={<VisibilityIcon />}
+                            onClick={() => handleViewFile(fileItem.id)}
+                          >
+                            View
+                          </Button>
+                          {role === 'admin' && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="error"
+                              startIcon={<DeleteIcon />}
+                              onClick={() => handleFileDelete(fileItem.id)}
+                            >
+                              Delete
+                            </Button>
+                          )}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Card>
 
-      <div className="card">
-        <h3>Available Files</h3>
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Filename</th>
-                <th>Size (Bytes)</th>
-                <th>Uploaded By</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {files.map(file => (
-                <tr key={file.id}>
-                  <td>{file.filename}</td>
-                  <td>{file.size_bytes}</td>
-                  <td>{file.uploaded_by}</td>
-                  <td>
-                    <button onClick={() => handleView(file.id)}>View</button>
-                    {role === 'admin' && (
-                      <button className="delete" onClick={() => handleDelete(file.id)}>Delete</button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {files.length === 0 && (
-                <tr><td colSpan={4} className="text-center">No files found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        {isLoadingContent && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', padding: 3 }}>
+            <CircularProgress />
+          </Box>
+        )}
 
-      {loadingContent && <p className="text-center">Loading CSV Data...</p>}
-      
-      {selectedFileContent && (
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
-            <h3>File Content</h3>
-            <button className="secondary" onClick={() => setSelectedFileContent(null)}>Close</button>
-          </div>
-          <DataViewer data={selectedFileContent} />
-        </div>
-      )}
-    </div>
+        {selectedFileContent && (
+          <Card sx={{ marginBottom: 3 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: 2,
+                borderBottom: '1px solid #e0e0e0',
+              }}
+            >
+              <Typography variant="h6" component="h3" sx={{ fontWeight: 600 }}>
+                File Content
+              </Typography>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={() => setSelectedFileContent(null)}
+              >
+                Close
+              </Button>
+            </Box>
+            <Box sx={{ padding: 2 }}>
+              <DataViewer csvData={selectedFileContent} />
+            </Box>
+          </Card>
+        )}
+      </Box>
+    </Container>
   );
 }

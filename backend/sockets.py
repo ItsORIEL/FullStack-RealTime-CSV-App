@@ -17,13 +17,10 @@ class ConnectionManager:
 
     async def broadcast(self, message: str):
         print(f"📢 Broadcasting '{message}' to {len(self.active_connections)} clients")
-        # Copy the list to avoid modification errors during iteration
         for connection in self.active_connections[:]:
             try:
                 await connection.send_text(message)
             except Exception:
-                # If sending fails, assume client is dead and remove
                 self.disconnect(connection)
 
-# Singleton Instance
 manager = ConnectionManager()

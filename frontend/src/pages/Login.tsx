@@ -1,82 +1,156 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Card,
+  TextField,
+  Button,
+  Typography,
+  Link,
+  Alert,
+  Container,
+  Stack,
+} from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
-import '../pages/Login.css';
 
 export default function Login() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [isLoginMode, setIsLoginMode] = useState(true);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleAuthSubmit = async (formEvent: React.FormEvent) => {
+    formEvent.preventDefault();
+    setErrorMessage('');
+    setIsProcessing(true);
 
     try {
-      if (isLogin) {
+      if (isLoginMode) {
         // Login Flow
-        const data = await authService.login(username, password);
-        login(data.access_token);
+        const authResponse = await authService.login(usernameInput, passwordInput);
+        login(authResponse.access_token);
         navigate('/');
       } else {
         // Signup Flow
-        await authService.signup(username, password);
+        await authService.signup(usernameInput, passwordInput);
         // Auto login after signup
-        const data = await authService.login(username, password);
-        login(data.access_token);
+        const authResponse = await authService.login(usernameInput, passwordInput);
+        login(authResponse.access_token);
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setErrorMessage(err.message || 'Authentication failed');
     } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
+  const toggleAuthMode = () => {
+    setIsLoginMode(!isLoginMode);
+    setErrorMessage('');
+    setUsernameInput('');
+    setPasswordInput('');
+  };
+
   return (
-    <div className="login-container card">
-      <h2 className="text-center">{isLogin ? 'Login' : 'Create Account'}</h2>
-      
-      {error && <div className="error">{error}</div>}
+    <Container maxWidth="sm">
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+        }}
+      >
+        <Card
+          sx={{
+            width: '100%',
+            padding: 4,
+            boxShadow: 3,
+          }}
+        >
+          <Typography
+            variant="h4"
+            component="h2"
+            align="center"
+            gutterBottom
+            sx={{ marginBottom: 3, fontWeight: 600 }}
+          >
+            {isLoginMode ? 'Login' : 'Create Account'}
+          </Typography>
 
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Username</label>
-          <input 
-            type="text" 
-            value={username} 
-            onChange={e => setUsername(e.target.value)} 
-            required 
-          />
-        </div>
-        
-        <div className="form-group">
-          <label>Password</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={e => setPassword(e.target.value)} 
-            required 
-          />
-        </div>
+          {errorMessage && (
+            <Alert severity="error" sx={{ marginBottom: 2 }}>
+              {errorMessage}
+            </Alert>
+          )}
 
-        <button type="submit" className="full-width" disabled={loading}>
-          {loading ? 'Processing...' : (isLogin ? 'Sign In' : 'Sign Up')}
-        </button>
-      </form>
+          <Box component="form" onSubmit={handleAuthSubmit} noValidate>
+            <Stack spacing={2}>
+              <TextField
+                fullWidth
+                label="Username"
+                type="text"
+                value={usernameInput}
+                onChange={(event) => setUsernameInput(event.target.value)}
+                required
+                variant="outlined"
+              />
 
-      <div className="text-center" style={{ marginTop: '15px' }}>
-        <span className="link-text" onClick={() => setIsLogin(!isLogin)}>
-          {isLogin ? "Need an account? Sign up" : "Have an account? Login"}
-        </span>
-      </div>
-    </div>
+              <TextField
+                fullWidth
+                label="Password"
+                type="password"
+                value={passwordInput}
+                onChange={(event) => setPasswordInput(event.target.value)}
+                required
+                variant="outlined"
+              />
+
+              <Button
+                fullWidth
+                variant="contained"
+                color="primary"
+                type="submit"
+                disabled={isProcessing}
+                sx={{ marginTop: 1, padding: '10px' }}
+              >
+                {isProcessing
+                  ? 'Processing...'
+                  : isLoginMode
+                    ? 'Sign In'
+                    : 'Sign Up'}
+              </Button>
+            </Stack>
+          </Box>
+
+          <Box sx={{ marginTop: 3, textAlign: 'center' }}>
+            <Typography variant="body2" color="textSecondary">
+              {isLoginMode ? "Need an account? " : "Have an account? "}
+              <Link
+                component="button"
+                variant="body2"
+                onClick={toggleAuthMode}
+                sx={{
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    textDecoration: 'underline',
+                  },
+                }}
+              >
+                {isLoginMode ? 'Sign up' : 'Login'}
+              </Link>
+            </Typography>
+          </Box>
+        </Card>
+      </Box>
+    </Container>
   );
 }
