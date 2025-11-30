@@ -1,180 +1,155 @@
-import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import './Dashboard.css';
+import { fileService } from '../services/fileService';
+import { useWebSocket } from '../hooks/useWebSocket'; // <--- Import the new hook
+import { FileMetadata } from '../types';
+import '../pages/Dashboard.css';
 
-interface FileData {
-  id: number;
-  filename: string;
-  size_bytes: number;
-  upload_date: string;
-  uploaded_by: string;
-}
+const DataViewer = ({ data }: { data: any[] }) => {
+  if (!data || data.length === 0) return <p>No data to display</p>;
+  const headers = Object.keys(data[0]);
+  return (
+    <div className="table-wrapper">
+      <table>
+        <thead>
+          <tr>{headers.map(h => <th key={h}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr key={i}>{headers.map(h => <td key={`${i}-${h}`}>{String(row[h])}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
 
 export default function Dashboard() {
-  const { token, logout, username, role } = useAuth();
-  
-  // State
-  const [files, setFiles] = useState<FileData[]>([]);
-  const [viewData, setViewData] = useState<any[] | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string>("");
-  const [uploading, setUploading] = useState(false);
-  
-  const socketRef = useRef<WebSocket | null>(null);
+  const { role, username, logout } = useAuth();
+  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [selectedFileContent, setSelectedFileContent] = useState<any[] | null>(null);
+  const [loadingContent, setLoadingContent] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const apiClient = axios.create({
-    baseURL: 'http://127.0.0.1:8000',
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  const fetchFiles = async () => {
+  // 1. Stable Load Function
+  const loadFiles = useCallback(async () => {
     try {
-      const response = await apiClient.get('/files');
-      setFiles(response.data);
+      const data = await fileService.getAll();
+      setFiles(data);
     } catch (error) {
       console.error("Failed to load files", error);
     }
-  };
-
-  useEffect(() => {
-    fetchFiles();
-    const websocket = new WebSocket('ws://127.0.0.1:8000/ws');
-    
-    websocket.onopen = () => console.log("✅ Connected to Real-Time Server");
-    websocket.onmessage = (event) => {
-      if (event.data === "file_uploaded" || event.data === "file_deleted") {
-        fetchFiles();
-      }
-    };
-    socketRef.current = websocket;
-    return () => websocket.close();
   }, []);
 
-  const handleUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!event.target.files || event.target.files.length === 0) return;
-    
-    setUploading(true);
-    const fileToUpload = event.target.files[0];
-    const formData = new FormData();
-    formData.append("file", fileToUpload);
+  // 2. Initial Load
+  useEffect(() => {
+    loadFiles();
+  }, [loadFiles]);
 
+  // 3. REAL-TIME MAGIC ✨
+  // This one line handles connection, disconnection, and auto-reconnection!
+  useWebSocket((message) => {
+    if (message === "file_uploaded" || message === "file_deleted") {
+      console.log("🔔 Update received:", message);
+      loadFiles();
+    }
+  });
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
     try {
-      await apiClient.post('/upload', formData);
+      await fileService.upload(e.target.files[0]);
+      // Note: WebSocket will trigger the update for everyone, including us
     } catch (error) {
-      alert("Upload failed! (Are you an admin?)");
+      alert("Upload failed!");
     } finally {
-      setUploading(false);
-      event.target.value = ""; 
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleDelete = async (fileId: number) => {
+  const handleDelete = async (id: number) => {
     if (!confirm("Are you sure?")) return;
     try {
-      await apiClient.delete(`/files/${fileId}`);
+      await fileService.delete(id);
+      // Note: WebSocket will trigger the update
+      setSelectedFileContent(null);
     } catch (error) {
-      alert("Delete failed!");
+      alert("Delete failed! (Are you an admin?)");
     }
   };
 
-  const handleView = async (file: FileData) => {
+  const handleView = async (id: number) => {
+    setLoadingContent(true);
     try {
-      const response = await apiClient.get(`/files/${file.id}/content`);
-      setViewData(response.data);
-      setSelectedFileName(file.filename);
+      const data = await fileService.getContent(id);
+      setSelectedFileContent(data);
     } catch (error) {
-      alert("Could not load CSV content.");
+      alert("Could not load file content");
+    } finally {
+      setLoadingContent(false);
     }
   };
 
   return (
     <div className="container">
-      {/* HEADER */}
       <div className="nav">
-        <h2>📂 CSV Dashboard</h2>
         <div>
-          <span>Logged in as: <b>{username}</b> ({role}) </span>
-          <button onClick={logout} className="delete small">Logout</button>
+          <h2>CSV Dashboard</h2>
+          <small>Welcome, {username} ({role})</small>
         </div>
+        <button className="secondary" onClick={logout}>Logout</button>
       </div>
 
-      {/* ADMIN UPLOAD SECTION */}
       {role === 'admin' && (
         <div className="card admin-upload">
-          <h3>📤 Upload New CSV</h3>
-          <input type="file" accept=".csv" onChange={handleUpload} disabled={uploading} />
-          {uploading && <span className="loading-text">Uploading...</span>}
+          <strong>Admin Upload:</strong>
+          <input type="file" accept=".csv" ref={fileInputRef} onChange={handleUpload} />
         </div>
       )}
 
-      {/* FILE LIST */}
       <div className="card">
         <h3>Available Files</h3>
-        {files.length === 0 ? <p>No files yet.</p> : (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Filename</th>
-                  <th>Uploaded By</th>
-                  <th>Size</th>
-                  <th>Actions</th>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Filename</th>
+                <th>Size (Bytes)</th>
+                <th>Uploaded By</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {files.map(file => (
+                <tr key={file.id}>
+                  <td>{file.filename}</td>
+                  <td>{file.size_bytes}</td>
+                  <td>{file.uploaded_by}</td>
+                  <td>
+                    <button onClick={() => handleView(file.id)}>View</button>
+                    {role === 'admin' && (
+                      <button className="delete" onClick={() => handleDelete(file.id)}>Delete</button>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {files.map(file => (
-                  <tr key={file.id}>
-                    <td>{file.filename}</td>
-                    <td>{file.uploaded_by}</td>
-                    <td>{file.size_bytes} B</td>
-                    <td>
-                      <button onClick={() => handleView(file)}>View</button>
-                      {role === 'admin' && (
-                        <button 
-                          className="delete" 
-                          onClick={() => handleDelete(file.id)} 
-                          style={{ marginLeft: '10px' }}
-                        >
-                          Delete
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+              {files.length === 0 && (
+                <tr><td colSpan={4} className="text-center">No files found</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* CSV DATA VIEWER */}
-      {viewData && (
+      {loadingContent && <p className="text-center">Loading CSV Data...</p>}
+      
+      {selectedFileContent && (
         <div className="card">
-          <div className="nav">
-            <h3>👁️ Viewing: {selectedFileName}</h3>
-            <button onClick={() => setViewData(null)} className="secondary">Close</button>
+          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'15px'}}>
+            <h3>File Content</h3>
+            <button className="secondary" onClick={() => setSelectedFileContent(null)}>Close</button>
           </div>
-          
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  {viewData.length > 0 && Object.keys(viewData[0]).map(headerKey => (
-                    <th key={headerKey}>{headerKey}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {viewData.map((row, rowIndex) => (
-                  <tr key={rowIndex}>
-                    {Object.values(row).map((cellValue: any, cellIndex) => (
-                      <td key={cellIndex}>{cellValue}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataViewer data={selectedFileContent} />
         </div>
       )}
     </div>

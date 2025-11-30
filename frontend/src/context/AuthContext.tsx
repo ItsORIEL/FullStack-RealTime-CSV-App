@@ -1,14 +1,12 @@
 import { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { jwtDecode } from "jwt-decode";
 
-// 1. Define what the Token looks like inside
 interface TokenPayload {
-  sub: string;  // username
-  role: string; // admin or user
+  sub: string;
+  role: string;
   exp: number;
 }
 
-// 2. Define what our Auth Context provides to the app
 interface AuthContextType {
   token: string | null;
   role: string | null;
@@ -24,11 +22,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [role, setRole] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
 
-  // When the app starts, or token changes, decode it
   useEffect(() => {
     if (token) {
       try {
         const decoded = jwtDecode<TokenPayload>(token);
+        // Optional: Check expiry here
+        if (decoded.exp * 1000 < Date.now()) {
+          throw new Error("Token expired");
+        }
         setRole(decoded.role);
         setUsername(decoded.sub);
         localStorage.setItem("token", token);
@@ -58,7 +59,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Hook to use auth easily
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) throw new Error("useAuth must be used within an AuthProvider");

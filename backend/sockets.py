@@ -2,24 +2,28 @@ from typing import List
 from fastapi import WebSocket
 
 class ConnectionManager:
-    """
-    Keeps track of active WebSocket connections 
-    and allows broadcasting messages to all of them.
-    """
     def __init__(self):
         self.active_connections: List[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        print(f"🔌 Client connected! Total: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            print(f"❌ Client disconnected. Total: {len(self.active_connections)}")
 
     async def broadcast(self, message: str):
-        """Sends a message to all connected clients."""
-        for connection in self.active_connections:
-            await connection.send_text(message)
+        print(f"📢 Broadcasting '{message}' to {len(self.active_connections)} clients")
+        # Copy the list to avoid modification errors during iteration
+        for connection in self.active_connections[:]:
+            try:
+                await connection.send_text(message)
+            except Exception:
+                # If sending fails, assume client is dead and remove
+                self.disconnect(connection)
 
-# Create a single instance to be used everywhere
+# Singleton Instance
 manager = ConnectionManager()

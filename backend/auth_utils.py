@@ -6,13 +6,8 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from database import get_session
 from models import User
+from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
-# --- SECURITY CONFIG ---
-SECRET_KEY = "super-secret-key-change-this-in-production"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
-# --- TOOLS ---
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -23,23 +18,18 @@ def verify_password(plain_password, hashed_password) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_access_token(data: dict):
-    """Generates a JWT token string."""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-# --- DEPENDENCIES (Route Protectors) ---
-
 def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)):
-    """Validates the token and returns the User object."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        # Decode Token
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
@@ -47,14 +37,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
     except jwt.PyJWTError:
         raise credentials_exception
         
-    # Fetch User from DB
     user = session.exec(select(User).where(User.username == username)).first()
     if user is None:
         raise credentials_exception
     return user
 
 def get_current_admin(current_user: User = Depends(get_current_user)):
-    """Ensures the user has 'admin' role."""
     if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
