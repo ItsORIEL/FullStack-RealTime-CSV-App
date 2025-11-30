@@ -22,11 +22,12 @@ npm install
 npm run dev
 ```
 
-Frontend runs on: `http://localhost:5173`
+Frontend runs on: `http://localhost:5173` (or next available port)
 
 ## Access the App
 
-- **URL**: http://localhost:5173
+- **URL**: Check the terminal output after running `npm run dev` for the exact URL
+- **Default**: http://localhost:5173 (if port is available)
 - **Default Login**: Use signup or existing credentials
 - **Admin Features**: Upload and delete files (admin role only)
 
