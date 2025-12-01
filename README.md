@@ -9,7 +9,28 @@ A full-stack real-time CSV file management application with WebSocket support.
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --reload
+```
+
+# Create a virtual environment
+```bash
+python -m venv venv
+```
+
+# Activate it (Windows)
+```bash
+.\venv\Scripts\Activate
+```
+
+Or install dependencies directly:
+
+```bash
+pip install "bcrypt==4.0.1" fastapi "uvicorn[standard]" sqlmodel psycopg2-binary python-multipart pyjwt "passlib[bcrypt]" pandas aiofiles websockets
+```
+
+Then start the server:
+
+```bash
+python -m uvicorn main:app --reload
 ```
 
 Backend runs on: `http://localhost:8000`

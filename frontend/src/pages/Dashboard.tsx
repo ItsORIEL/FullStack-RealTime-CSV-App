@@ -21,65 +21,12 @@ import { useAuth } from '../context/AuthContext';
 import { fileService } from '../services/fileService';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { FileMetadata } from '../types';
-
-const DataViewer = ({ csvData }: { csvData: any[] }) => {
-  if (!csvData || csvData.length === 0) {
-    return (
-      <Typography color="textSecondary" align="center" sx={{ padding: 2 }}>
-        No data to display
-      </Typography>
-    );
-  }
-
-  const columnHeaders = Object.keys(csvData[0]);
-
-  return (
-    <TableContainer component={Paper} sx={{ marginTop: 2 }}>
-      <Table stickyHeader>
-        <TableHead>
-          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-            {columnHeaders.map((headerName) => (
-              <TableCell
-                key={headerName}
-                sx={{
-                  fontWeight: 600,
-                  backgroundColor: '#f5f5f5',
-                  textTransform: 'uppercase',
-                  fontSize: '0.85rem',
-                }}
-              >
-                {headerName}
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {csvData.map((rowData, rowIndex) => (
-            <TableRow
-              key={rowIndex}
-              sx={{
-                '&:hover': {
-                  backgroundColor: '#f9f9f9',
-                },
-              }}
-            >
-              {columnHeaders.map((headerName) => (
-                <TableCell key={`${rowIndex}-${headerName}`}>
-                  {String(rowData[headerName])}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-};
+import DataViewer from '../components/DataViewer';
 
 export default function Dashboard() {
   const { role, username, logout } = useAuth();
   const [filesList, setFilesList] = useState<FileMetadata[]>([]);
-  const [selectedFileContent, setSelectedFileContent] = useState<any[] | null>(null);
+  const [selectedFileContent, setSelectedFileContent] = useState<Record<string, string | number>[] | null>(null);
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,8 +34,8 @@ export default function Dashboard() {
     try {
       const filesData = await fileService.getAll();
       setFilesList(filesData);
-    } catch (error) {
-      console.error('Failed to load files', error);
+    } catch {
+      console.error('Failed to load files');
     }
   }, []);
 
@@ -107,7 +54,7 @@ export default function Dashboard() {
     if (!uploadEvent.target.files || !uploadEvent.target.files[0]) return;
     try {
       await fileService.upload(uploadEvent.target.files[0]);
-    } catch (error) {
+    } catch {
       alert('Upload failed!');
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -119,7 +66,7 @@ export default function Dashboard() {
     try {
       await fileService.delete(fileId);
       setSelectedFileContent(null);
-    } catch (error) {
+    } catch {
       alert('Delete failed! (Are you an admin?)');
     }
   };
@@ -129,7 +76,7 @@ export default function Dashboard() {
     try {
       const csvContent = await fileService.getContent(fileId);
       setSelectedFileContent(csvContent);
-    } catch (error) {
+    } catch {
       alert('Could not load file content');
     } finally {
       setIsLoadingContent(false);

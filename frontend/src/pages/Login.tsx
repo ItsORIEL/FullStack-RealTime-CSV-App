@@ -7,7 +7,6 @@ import {
   Button,
   Typography,
   Link,
-  Alert,
   Container,
   Stack,
 } from '@mui/material';
@@ -18,7 +17,6 @@ export default function Login() {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const { login } = useAuth();
@@ -26,7 +24,6 @@ export default function Login() {
 
   const handleAuthSubmit = async (formEvent: React.FormEvent) => {
     formEvent.preventDefault();
-    setErrorMessage('');
     setIsProcessing(true);
 
     try {
@@ -43,8 +40,9 @@ export default function Login() {
         login(authResponse.access_token);
         navigate('/');
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Authentication failed');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Authentication failed';
+      alert(errorMessage);
     } finally {
       setIsProcessing(false);
     }
@@ -52,7 +50,6 @@ export default function Login() {
 
   const toggleAuthMode = () => {
     setIsLoginMode(!isLoginMode);
-    setErrorMessage('');
     setUsernameInput('');
     setPasswordInput('');
   };
@@ -83,12 +80,6 @@ export default function Login() {
           >
             {isLoginMode ? 'Login' : 'Create Account'}
           </Typography>
-
-          {errorMessage && (
-            <Alert severity="error" sx={{ marginBottom: 2 }}>
-              {errorMessage}
-            </Alert>
-          )}
 
           <Box component="form" onSubmit={handleAuthSubmit} noValidate>
             <Stack spacing={2}>
